@@ -178,19 +178,38 @@ export class Parser {
 
   private term(): ASTNode {
     let node = this.factor();
-    while (this.currentToken.type === TokenType.MUL || this.currentToken.type === TokenType.DIV) {
+    while (
+      this.currentToken.type === TokenType.MUL || 
+      this.currentToken.type === TokenType.DIV ||
+      this.currentToken.type === TokenType.LPAREN ||
+      this.currentToken.type === TokenType.NUMBER
+    ) {
       const token = this.currentToken;
       if (token.type === TokenType.MUL) {
         this.eat(TokenType.MUL);
+        node = {
+          type: "BinOpNode",
+          op: token.value,
+          left: node,
+          right: this.factor()
+        };
       } else if (token.type === TokenType.DIV) {
         this.eat(TokenType.DIV);
+        node = {
+          type: "BinOpNode",
+          op: token.value,
+          left: node,
+          right: this.factor()
+        };
+      } else if (token.type === TokenType.LPAREN || token.type === TokenType.NUMBER) {
+        // Implicit multiplication
+        node = {
+          type: "BinOpNode",
+          op: "*",
+          left: node,
+          right: this.factor()
+        };
       }
-      node = {
-        type: "BinOpNode",
-        op: token.value,
-        left: node,
-        right: this.factor()
-      };
     }
     return node;
   }

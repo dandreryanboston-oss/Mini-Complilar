@@ -179,16 +179,22 @@ class Parser:
 
     def term(self):
         """
-        Term : Factor ((MUL | DIV) Factor)*
+        Term : Factor ( ((MUL | DIV) Factor) | Factor )*
+        The second 'Factor' case handles implicit multiplication.
         """
         node = self.factor()
-        while self.current_token.type in (TokenType.MUL, TokenType.DIV):
+        while self.current_token.type in (TokenType.MUL, TokenType.DIV, TokenType.LPAREN, TokenType.NUMBER):
             token = self.current_token
             if token.type == TokenType.MUL:
                 self.eat(TokenType.MUL)
+                node = BinOpNode(left=node, op_token=token, right=self.factor())
             elif token.type == TokenType.DIV:
                 self.eat(TokenType.DIV)
-            node = BinOpNode(left=node, op_token=token, right=self.factor())
+                node = BinOpNode(left=node, op_token=token, right=self.factor())
+            elif token.type in (TokenType.LPAREN, TokenType.NUMBER):
+                # Implicit multiplication
+                virtual_op = Token(TokenType.MUL, '*')
+                node = BinOpNode(left=node, op_token=virtual_op, right=self.factor())
         return node
 
     def expr(self):
