@@ -1,0 +1,5 @@
+{
+  "name": "Mini Math Compiler",
+  "description": "An academic mini compiler for mathematical expressions implementing Lexical, Syntax, and Semantic analysis with AST visualization.",
+  "requestFramePermissions": []
+}
