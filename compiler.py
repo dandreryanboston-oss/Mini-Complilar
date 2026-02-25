@@ -184,14 +184,13 @@ class Parser:
         """
         node = self.factor()
         while self.current_token.type in (TokenType.MUL, TokenType.DIV, TokenType.LPAREN, TokenType.NUMBER):
-            token = self.current_token
-            if token.type == TokenType.MUL:
+            if self.current_token.type == TokenType.MUL:
                 self.eat(TokenType.MUL)
-                node = BinOpNode(left=node, op_token=token, right=self.factor())
-            elif token.type == TokenType.DIV:
+                node = BinOpNode(left=node, op_token=Token(TokenType.MUL, '*'), right=self.factor())
+            elif self.current_token.type == TokenType.DIV:
                 self.eat(TokenType.DIV)
-                node = BinOpNode(left=node, op_token=token, right=self.factor())
-            elif token.type in (TokenType.LPAREN, TokenType.NUMBER):
+                node = BinOpNode(left=node, op_token=Token(TokenType.DIV, '/'), right=self.factor())
+            elif self.current_token.type in (TokenType.LPAREN, TokenType.NUMBER):
                 # Implicit multiplication
                 virtual_op = Token(TokenType.MUL, '*')
                 node = BinOpNode(left=node, op_token=virtual_op, right=self.factor())
