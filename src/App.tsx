@@ -17,7 +17,7 @@ import {
 } from 'lucide-react';
 import * as d3 from 'd3';
 
-type Language = 'en' | 'es' | 'fr';
+type Language = 'en' | 'es';
 
 const translations = {
   en: {
@@ -81,37 +81,6 @@ const translations = {
       frontend: "Ingeniero Frontend",
       testing: "Ingeniero de Calidad (QA)"
     }
-  },
-  fr: {
-    title: "MiniCompilateur",
-    subtitle: "v1.0.0-académique",
-    status: "Moteur de Compilation Actif",
-    source: "Expression Source",
-    placeholder: "Entrez l'expression (ex., 2^3 + 4 * 5)",
-    compile: "Compiler",
-    lexical: "Analyse Lexicale (Tokens)",
-    syntax: "Arbre Syntaxique (AST)",
-    semantic: "Évaluation Sémantique",
-    result: "Résultat Final",
-    noTree: "Aucun arbre généré",
-    errorConn: "Échec de la connexion au service du compilateur.",
-    waiting: "En attente de compilation...",
-    phases: "Phases de Compilation Implémentées",
-    phase1: "1. Analyse Lexicale",
-    phase1Desc: "Convertit la chaîne d'entrée en une séquence de jetons (NOMBRE, OP, PAREN).",
-    phase2: "2. Analyse Syntaxique",
-    phase2Desc: "L'analyseur à descente récursive valide la grammaire et la priorité.",
-    phase3: "3. Construction de l'AST",
-    phase3Desc: "Construit une représentation hiérarchique de la structure de l'expression.",
-    phase4: "4. Évaluation Sémantique",
-    phase4Desc: "Parcourt récursivement l'AST pour calculer le résultat mathématique.",
-    creators: "Équipe de Développement",
-    roles: {
-      backend: "Architecte Backend",
-      idea: "Chef de Produit",
-      frontend: "Ingénieur Frontend",
-      testing: "Ingénieur Qualité (QA)"
-    }
   }
 };
 
@@ -158,6 +127,7 @@ const TreeDiagram: React.FC<{ data: ASTNode }> = ({ data }) => {
       const children = [];
       if (d.left) children.push(d.left);
       if (d.right) children.push(d.right);
+      if (d.node) children.push(d.node);
       return children.length > 0 ? children : null;
     });
 
@@ -280,7 +250,7 @@ export default function App() {
             </div>
             
             <div className="flex items-center bg-zinc-800/50 rounded-full p-1 border border-zinc-700/50">
-              {(['en', 'es', 'fr'] as Language[]).map((l) => (
+              {(['en', 'es'] as Language[]).map((l) => (
                 <button
                   key={l}
                   onClick={() => setLang(l)}

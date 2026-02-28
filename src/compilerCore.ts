@@ -118,11 +118,12 @@ export class Lexer {
 }
 
 export interface ASTNode {
-  type: "NumberNode" | "BinOpNode";
+  type: "NumberNode" | "BinOpNode" | "UnaryOpNode";
   value?: number;
   op?: string;
   left?: ASTNode;
   right?: ASTNode;
+  node?: ASTNode;
 }
 
 export class Parser {
@@ -148,7 +149,13 @@ export class Parser {
 
   private power(): ASTNode {
     const token = this.currentToken;
-    if (token.type === TokenType.NUMBER) {
+    if (token.type === TokenType.PLUS) {
+      this.eat(TokenType.PLUS);
+      return { type: "UnaryOpNode", op: "+", node: this.power() };
+    } else if (token.type === TokenType.MINUS) {
+      this.eat(TokenType.MINUS);
+      return { type: "UnaryOpNode", op: "-", node: this.power() };
+    } else if (token.type === TokenType.NUMBER) {
       this.eat(TokenType.NUMBER);
       return { type: "NumberNode", value: token.value };
     } else if (token.type === TokenType.LPAREN) {
@@ -245,6 +252,12 @@ export class Evaluator {
   public evaluate(node: ASTNode): number {
     if (node.type === "NumberNode") {
       return node.value!;
+    }
+
+    if (node.type === "UnaryOpNode") {
+      const val = this.evaluate(node.node!);
+      if (node.op === "+") return val;
+      if (node.op === "-") return -val;
     }
 
     if (node.type === "BinOpNode") {

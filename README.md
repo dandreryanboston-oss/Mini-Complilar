@@ -1,14 +1,15 @@
 # Mini Compilador Matemático 🚀
 
-Una implementación académica de un compilador de expresiones matemáticas siguiendo las fases clásicas de compilación. Este proyecto cuenta con un motor de compilación basado en Python integrado en un tablero web moderno y trilingüe (EN/ES/FR).
+Una implementación académica de un compilador de expresiones matemáticas siguiendo las fases clásicas de compilación. Este proyecto cuenta con un motor de compilación basado en Python integrado en un tablero web moderno y bilingüe (EN/ES).
 
 ## 🌟 Características
 
 - **Pipeline de Compilación Clásico**: Implementación completa de análisis Léxico, Sintáctico y Semántico.
 - **Árbol de Sintaxis Abstracta (AST)**: Visualización profesional de la estructura de la expresión utilizando D3.js.
-- **Soporte Trilingüe**: Interfaz disponible en inglés, español y francés.
+- **Soporte Bilingüe**: Interfaz disponible en inglés y español.
 - **Tablero Moderno**: Visualización en tiempo real de la tokenización y la evaluación.
-- **Soporte Matemático**: Maneja enteros, decimales, operadores básicos (+, -, *, /), paréntesis y potenciación (^).
+- **Soporte Matemático Avanzado**: Maneja enteros, decimales, operadores básicos (+, -, *, /), paréntesis, potenciación (^) y **operadores unarios** (+, -).
+- **Multiplicación Implícita**: Soporta expresiones como `5(2+3)` o `(2)3`.
 
 ---
 
@@ -32,6 +33,7 @@ El **Parser** utiliza un algoritmo de **Descenso Recursivo** para validar la sec
 ### 3. Construcción del AST
 El AST es una representación jerárquica de la estructura de la expresión.
 - **NumberNodes**: Nodos hoja que contienen valores numéricos.
+- **UnaryOpNodes**: Nodos que representan operadores unarios (positivo/negativo).
 - **BinOpNodes**: Nodos internos que contienen un operador y dos hijos (izquierdo y derecho).
 - Esta estructura facilita el recorrido y la evaluación de la lógica matemática.
 

@@ -118,6 +118,18 @@ class NumberNode(ASTNode):
     def to_dict(self):
         return {"type": "NumberNode", "value": self.value}
 
+class UnaryOpNode(ASTNode):
+    def __init__(self, op_token, node):
+        self.op_token = op_token
+        self.node = node
+
+    def to_dict(self):
+        return {
+            "type": "UnaryOpNode",
+            "op": self.op_token.value,
+            "node": self.node.to_dict()
+        }
+
 class BinOpNode(ASTNode):
     def __init__(self, left, op_token, right):
         self.left = left
@@ -152,10 +164,16 @@ class Parser:
 
     def power(self):
         """
-        Power : NUMBER | LPAREN Expression RPAREN
+        Power : (PLUS | MINUS) Power | NUMBER | LPAREN Expression RPAREN
         """
         token = self.current_token
-        if token.type == TokenType.NUMBER:
+        if token.type == TokenType.PLUS:
+            self.eat(TokenType.PLUS)
+            return UnaryOpNode(op_token=token, node=self.power())
+        elif token.type == TokenType.MINUS:
+            self.eat(TokenType.MINUS)
+            return UnaryOpNode(op_token=token, node=self.power())
+        elif token.type == TokenType.NUMBER:
             self.eat(TokenType.NUMBER)
             return NumberNode(token)
         elif token.type == TokenType.LPAREN:
@@ -225,6 +243,13 @@ class Evaluator:
         if isinstance(node, NumberNode):
             return node.value
         
+        if isinstance(node, UnaryOpNode):
+            val = self.evaluate(node.node)
+            if node.op_token.type == TokenType.PLUS:
+                return val
+            if node.op_token.type == TokenType.MINUS:
+                return -val
+
         if isinstance(node, BinOpNode):
             left_val = self.evaluate(node.left)
             right_val = self.evaluate(node.right)
@@ -252,6 +277,9 @@ class Evaluator:
 def print_tree(node, indent=""):
     if isinstance(node, NumberNode):
         print(f"{indent}Number({node.value})")
+    elif isinstance(node, UnaryOpNode):
+        print(f"{indent}UnaryOp({node.op_token.value})")
+        print_tree(node.node, indent + "  ")
     elif isinstance(node, BinOpNode):
         print(f"{indent}Op({node.op_token.value})")
         print_tree(node.left, indent + "  ")
