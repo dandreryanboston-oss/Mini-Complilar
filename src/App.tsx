@@ -25,24 +25,28 @@ const translations = {
     subtitle: "v1.0.0-academic",
     status: "Compiler Engine Active",
     source: "Source Expression",
-    placeholder: "Enter expression (e.g., 2^3 + 4 * 5)",
+    placeholder: "Enter expression (e.g., 3x^2 + 2x - 5 or \"Hello \" + \"World\")",
     compile: "Compile",
     lexical: "Lexical Analysis (Tokens)",
     syntax: "Syntax Tree (AST)",
     semantic: "Semantic Evaluation",
     result: "Final Result",
+    simplified: "Simplified Expression",
+    converted: "Converted Expression",
+    automaton: "DFA Automaton",
+    automatonDesc: "The lexer uses a Deterministic Finite Automaton (DFA) to classify tokens. States: START, NUMBER, VARIABLE, STRING.",
     noTree: "No tree generated",
     errorConn: "Failed to connect to the compiler service.",
     waiting: "Waiting for compilation...",
     phases: "Compilation Phases Implemented",
-    phase1: "1. Lexical Analysis",
-    phase1Desc: "Converts input string into a sequence of tokens (NUMBER, OP, PAREN).",
+    phase1: "1. Lexical Analysis (DFA)",
+    phase1Desc: "Converts input string into a sequence of tokens using a state machine (NUMBER, VARIABLE, STRING, OP).",
     phase2: "2. Syntax Analysis",
-    phase2Desc: "Recursive descent parser validates grammar and operator precedence.",
+    phase2Desc: "Recursive descent parser handles polynomials, implicit multiplication, and string literals.",
     phase3: "3. AST Construction",
-    phase3Desc: "Builds a hierarchical representation of the expression structure.",
+    phase3Desc: "Builds a hierarchical representation supporting variables and complex expressions.",
     phase4: "4. Semantic Evaluation",
-    phase4Desc: "Recursively traverses the AST to compute the mathematical result.",
+    phase4Desc: "Evaluates expressions with variable context and handles string concatenation.",
     creators: "Development Team",
     roles: {
       backend: "Backend Architect",
@@ -56,24 +60,28 @@ const translations = {
     subtitle: "v1.0.0-académico",
     status: "Motor de Compilación Activo",
     source: "Expresión de Origen",
-    placeholder: "Ingrese expresión (ej., 2^3 + 4 * 5)",
+    placeholder: "Ingrese expresión (ej., 3x^2 + 2x - 5 o \"Hola \" + \"Mundo\")",
     compile: "Compilar",
     lexical: "Análisis Léxico (Tokens)",
     syntax: "Árbol Sintáctico (AST)",
     semantic: "Evaluación Semántica",
     result: "Resultado Final",
+    simplified: "Expresión Simplificada",
+    converted: "Expresión Convertida",
+    automaton: "Autómata DFA",
+    automatonDesc: "El lexer utiliza un Autómata Finito Determinista (DFA) para clasificar tokens. Estados: START, NUMBER, VARIABLE, STRING.",
     noTree: "No se generó el árbol",
     errorConn: "Error al conectar con el servicio del compilador.",
     waiting: "Esperando compilación...",
     phases: "Etapas de Compilación Implementadas",
-    phase1: "1. Analizador Léxico",
-    phase1Desc: "Convierte la cadena de entrada en una secuencia de tokens (NUM, OP, PAR).",
+    phase1: "1. Analizador Léxico (DFA)",
+    phase1Desc: "Convierte la cadena de entrada en tokens usando una máquina de estados (NUM, VAR, STR, OP).",
     phase2: "2. Analizador Sintáctico",
-    phase2Desc: "El analizador de descenso recursivo valida la gramática y precedencia.",
+    phase2Desc: "El parser de descenso recursivo maneja polinomios, multiplicación implícita y cadenas.",
     phase3: "3. Construcción del AST",
-    phase3Desc: "Construye una representación jerárquica de la estructura de la expresión.",
+    phase3Desc: "Construye una representación jerárquica que soporta variables y expresiones complejas.",
     phase4: "4. Evaluación Semántica",
-    phase4Desc: "Recorre recursivamente el AST para calcular el resultado matemático.",
+    phase4Desc: "Evalúa expresiones con contexto de variables y maneja concatenación de cadenas.",
     creators: "Equipo de Desarrollo",
     roles: {
       backend: "Arquitecto Backend",
@@ -84,7 +92,7 @@ const translations = {
   }
 };
 
-import { Lexer, Parser, Evaluator } from './compilerCore';
+import { Lexer, Parser, Evaluator, MathPreprocessor } from './compilerCore';
 
 interface Token {
   type: string;
@@ -94,15 +102,19 @@ interface Token {
 interface ASTNode {
   type: string;
   value?: any;
+  name?: string;
   op?: string;
   left?: ASTNode;
   right?: ASTNode;
+  node?: ASTNode;
 }
 
 interface CompileResult {
   tokens: Token[];
   ast: ASTNode;
-  result: number;
+  result: any;
+  simplified: string;
+  converted: string;
   error?: string;
 }
 
@@ -163,7 +175,12 @@ const TreeDiagram: React.FC<{ data: ASTNode }> = ({ data }) => {
     nodes.append("text")
       .attr("dy", "0.35em")
       .attr("text-anchor", "middle")
-      .text((d: any) => d.data.type === 'NumberNode' ? d.data.value : d.data.op)
+      .text((d: any) => {
+        if (d.data.type === 'NumberNode') return d.data.value;
+        if (d.data.type === 'VariableNode') return d.data.name;
+        if (d.data.type === 'StringNode') return `"${d.data.value}"`;
+        return d.data.op;
+      })
       .attr("fill", "#ffffff")
       .attr("font-family", "JetBrains Mono, monospace")
       .attr("font-size", "18px")
@@ -182,10 +199,11 @@ export default function App() {
   const [lang, setLang] = useState<Language>('en');
   const t = useMemo(() => translations[lang], [lang]);
 
-  const [expression, setExpression] = useState('3 + 5 * (10 / 2)');
+  const [expression, setExpression] = useState('3x^2 + 2x - 5');
   const [result, setResult] = useState<CompileResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showJson, setShowJson] = useState(false);
 
   const handleCompile = async (e?: React.FormEvent) => {
     e?.preventDefault();
@@ -196,23 +214,29 @@ export default function App() {
     await new Promise(resolve => setTimeout(resolve, 300));
 
     try {
+      // 0. Natural Language Preprocessing
+      const convertedExpression = MathPreprocessor.convert(expression);
+
       // 1. Lexical Analysis
-      const lexer = new Lexer(expression);
+      const lexer = new Lexer(convertedExpression);
       const tokens = lexer.tokenize();
 
       // 2. Syntax Analysis
-      const lexerForParser = new Lexer(expression);
+      const lexerForParser = new Lexer(convertedExpression);
       const parser = new Parser(lexerForParser);
       const ast = parser.parse();
 
       // 3. Semantic Evaluation
       const evaluator = new Evaluator();
-      const finalResult = evaluator.evaluate(ast);
+      const finalResult = evaluator.evaluate(ast, { x: 2, y: 3 }); // Default context for evaluation
+      const simplified = evaluator.simplify(ast);
 
       setResult({
         tokens: tokens as any,
         ast: ast as any,
-        result: finalResult
+        result: finalResult,
+        simplified: simplified,
+        converted: convertedExpression
       });
     } catch (err: any) {
       setError(err.message || t.errorConn);
@@ -276,25 +300,37 @@ export default function App() {
               <Terminal className="w-4 h-4" />
               <h2 className="text-xs font-semibold uppercase tracking-wider">{t.source}</h2>
             </div>
-            <form onSubmit={handleCompile} className="relative group">
-              <input
-                type="text"
-                value={expression}
-                onChange={(e) => setExpression(e.target.value)}
-                placeholder={t.placeholder}
-                className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-4 py-4 font-mono text-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all shadow-inner"
-              />
+            <form onSubmit={handleCompile} className="flex flex-col gap-3">
+              <div className="relative group">
+                <textarea
+                  value={expression}
+                  onChange={(e) => setExpression(e.target.value)}
+                  placeholder={t.placeholder}
+                  rows={3}
+                  className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-4 py-4 font-mono text-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all shadow-inner resize-none overflow-y-auto custom-scrollbar"
+                />
+              </div>
+              {result && result.converted !== expression && (
+                <motion.div 
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: 'auto' }}
+                  className="bg-indigo-500/10 border border-indigo-500/20 rounded-lg p-3 text-xs font-mono"
+                >
+                  <p className="text-indigo-400 font-bold mb-1 uppercase tracking-tighter">{t.converted}:</p>
+                  <p className="text-zinc-300">{result.converted}</p>
+                </motion.div>
+              )}
               <button
                 type="submit"
                 disabled={loading}
-                className="absolute right-2 top-2 bottom-2 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white px-4 rounded-lg flex items-center gap-2 transition-all active:scale-95 shadow-lg shadow-indigo-500/20"
+                className="w-full bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white py-3 rounded-xl flex items-center justify-center gap-2 transition-all active:scale-[0.98] shadow-lg shadow-indigo-500/20"
               >
                 {loading ? (
-                  <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                 ) : (
-                  <Play className="w-4 h-4 fill-current" />
+                  <Play className="w-5 h-5 fill-current" />
                 )}
-                <span className="text-sm font-medium">{t.compile}</span>
+                <span className="font-semibold">{t.compile}</span>
               </button>
             </form>
           </section>
@@ -329,15 +365,29 @@ export default function App() {
 
         {/* Right Column: AST & Result */}
         <div className="lg:col-span-7 space-y-8">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+          <div className="grid grid-cols-1 gap-8">
             <section className="space-y-4 flex flex-col">
-              <div className="flex items-center gap-2 text-zinc-400">
-                <Layers className="w-4 h-4" />
-                <h2 className="text-xs font-semibold uppercase tracking-wider">{t.syntax}</h2>
+              <div className="flex items-center justify-between text-zinc-400">
+                <div className="flex items-center gap-2">
+                  <Layers className="w-4 h-4" />
+                  <h2 className="text-xs font-semibold uppercase tracking-wider">{t.syntax}</h2>
+                </div>
+                <button 
+                  onClick={() => setShowJson(!showJson)}
+                  className="text-[10px] font-bold uppercase px-2 py-1 bg-zinc-800 rounded hover:bg-zinc-700 transition-colors"
+                >
+                  {showJson ? 'View Tree' : 'View JSON'}
+                </button>
               </div>
-              <div className="flex-1 bg-zinc-900 border border-zinc-800 rounded-xl p-6 font-mono overflow-auto min-h-[400px] shadow-inner">
+              <div className="flex-1 bg-zinc-900 border border-zinc-800 rounded-xl p-6 font-mono overflow-auto min-h-[400px] shadow-inner relative">
                 {result?.ast ? (
-                  <TreeDiagram data={result.ast} />
+                  showJson ? (
+                    <pre className="text-[10px] text-indigo-300 whitespace-pre-wrap">
+                      {JSON.stringify(result.ast, null, 2)}
+                    </pre>
+                  ) : (
+                    <TreeDiagram data={result.ast} />
+                  )
                 ) : (
                   <div className="h-full flex items-center justify-center text-zinc-700 italic text-sm">
                     {t.noTree}
@@ -346,39 +396,58 @@ export default function App() {
               </div>
             </section>
 
-            <section className="space-y-4 flex flex-col">
-              <div className="flex items-center gap-2 text-zinc-400">
-                <Calculator className="w-4 h-4" />
-                <h2 className="text-xs font-semibold uppercase tracking-wider">{t.semantic}</h2>
-              </div>
-              <div className="flex-1 bg-zinc-900 border border-zinc-800 rounded-xl p-6 flex flex-col items-center justify-center gap-4 shadow-inner relative overflow-hidden">
-                <div className="absolute inset-0 bg-indigo-500/5 pointer-events-none" />
-                <div className="text-zinc-500 text-sm uppercase tracking-widest font-mono z-10">{t.result}</div>
-                <div className="text-6xl font-bold tracking-tighter text-white z-10">
-                  {result ? (
-                    <motion.span
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      key={result.result}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+              <section className="space-y-4 flex flex-col">
+                <div className="flex items-center gap-2 text-zinc-400">
+                  <Calculator className="w-4 h-4" />
+                  <h2 className="text-xs font-semibold uppercase tracking-wider">{t.semantic}</h2>
+                </div>
+                <div className="flex-1 bg-zinc-900 border border-zinc-800 rounded-xl p-6 flex flex-col items-center justify-center gap-4 shadow-inner relative overflow-hidden">
+                  <div className="absolute inset-0 bg-indigo-500/5 pointer-events-none" />
+                  <div className="text-zinc-500 text-sm uppercase tracking-widest font-mono z-10">{t.result} (x=2, y=3)</div>
+                  <div className="text-5xl font-bold tracking-tighter text-white z-10 text-center">
+                    {result ? (
+                      <motion.span
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        key={result.result}
+                      >
+                        {typeof result.result === 'number' 
+                          ? (Number.isInteger(result.result) ? result.result : result.result.toFixed(4))
+                          : result.result
+                        }
+                      </motion.span>
+                    ) : (
+                      <span className="text-zinc-800">--</span>
+                    )}
+                  </div>
+                  {error && (
+                    <motion.div 
+                      initial={{ opacity: 0, scale: 0.95 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      className="mt-4 flex items-center gap-2 text-red-400 bg-red-400/10 border border-red-400/20 px-4 py-2 rounded-lg text-sm z-10"
                     >
-                      {Number.isInteger(result.result) ? result.result : result.result.toFixed(4)}
-                    </motion.span>
-                  ) : (
-                    <span className="text-zinc-800">--</span>
+                      <AlertCircle className="w-4 h-4" />
+                      {error}
+                    </motion.div>
                   )}
                 </div>
-                {error && (
-                  <motion.div 
-                    initial={{ opacity: 0, scale: 0.95 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    className="mt-4 flex items-center gap-2 text-red-400 bg-red-400/10 border border-red-400/20 px-4 py-2 rounded-lg text-sm z-10"
-                  >
-                    <AlertCircle className="w-4 h-4" />
-                    {error}
-                  </motion.div>
-                )}
-              </div>
-            </section>
+              </section>
+
+              <section className="space-y-4 flex flex-col">
+                <div className="flex items-center gap-2 text-zinc-400">
+                  <Binary className="w-4 h-4" />
+                  <h2 className="text-xs font-semibold uppercase tracking-wider">{t.simplified}</h2>
+                </div>
+                <div className="flex-1 bg-zinc-900 border border-zinc-800 rounded-xl p-6 flex flex-col items-center justify-center gap-4 shadow-inner relative overflow-hidden">
+                  <div className="absolute inset-0 bg-emerald-500/5 pointer-events-none" />
+                  <div className="text-zinc-500 text-sm uppercase tracking-widest font-mono z-10">Stringify / Simplified</div>
+                  <div className="text-2xl font-mono font-medium text-emerald-400 z-10 text-center break-all">
+                    {result?.simplified || <span className="text-zinc-800">--</span>}
+                  </div>
+                </div>
+              </section>
+            </div>
           </div>
 
           {/* Academic Info */}

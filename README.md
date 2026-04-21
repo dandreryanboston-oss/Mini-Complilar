@@ -2,6 +2,28 @@
 
 Una implementación académica de un compilador de expresiones matemáticas siguiendo las fases clásicas de compilación. Este proyecto cuenta con un motor de compilación basado en Python integrado en un tablero web moderno y bilingüe (EN/ES).
 
+---
+
+## 📖 Documentación del Proyecto
+
+### Resumen del Proyecto (Overview)
+Este proyecto nace como una herramienta educativa para demostrar el funcionamiento interno de un compilador. A diferencia de una simple calculadora, este sistema procesa el texto de entrada a través de un pipeline formal de compilación, permitiendo a los estudiantes visualizar cómo una cadena de caracteres se transforma en una estructura lógica (AST) y finalmente en un valor semántico.
+
+### Objetivos
+- **Educativo**: Proporcionar una plataforma visual para entender las fases de análisis léxico, sintáctico y semántico.
+- **Técnico**: Implementar un analizador de descenso recursivo capaz de manejar precedencia de operadores y recursividad.
+- **Visual**: Utilizar herramientas modernas de visualización (D3.js) para representar estructuras de datos complejas como los árboles de sintaxis.
+
+### Alcance
+El compilador soporta una gramática extendida que incluye:
+- Operaciones aritméticas básicas.
+- Potenciación con asociatividad derecha.
+- Agrupación por paréntesis anidados.
+- Operadores unarios para números positivos y negativos.
+- Multiplicación implícita para una sintaxis más natural.
+
+---
+
 ## 🌟 Características
 
 - **Pipeline de Compilación Clásico**: Implementación completa de análisis Léxico, Sintáctico y Semántico.
