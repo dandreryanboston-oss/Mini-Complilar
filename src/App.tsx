@@ -48,6 +48,8 @@ const translations = {
     phase4: "4. Semantic Evaluation",
     phase4Desc: "Evaluates expressions with variable context and handles string concatenation.",
     creators: "Development Team",
+    tabMath: "Expression Compiler",
+    tabVm: "Stack VM Compiler",
     roles: {
       backend: "Backend Architect",
       idea: "Product Lead",
@@ -83,6 +85,8 @@ const translations = {
     phase4: "4. Evaluación Semántica",
     phase4Desc: "Evalúa expresiones con contexto de variables y maneja concatenación de cadenas.",
     creators: "Equipo de Desarrollo",
+    tabMath: "Compilador Matemático",
+    tabVm: "Compilador de Pila VM",
     roles: {
       backend: "Arquitecto Backend",
       idea: "Líder de Proyecto",
@@ -93,6 +97,8 @@ const translations = {
 };
 
 import { Lexer, Parser, Evaluator, MathPreprocessor } from './compilerCore';
+import SystemAutomaton from './components/SystemAutomaton';
+import StackVmSimulator from './components/StackVmSimulator';
 
 interface Token {
   type: string;
@@ -199,6 +205,7 @@ export default function App() {
   const [lang, setLang] = useState<Language>('en');
   const t = useMemo(() => translations[lang], [lang]);
 
+  const [activeTab, setActiveTab] = useState<'math' | 'vm'>('vm');
   const [expression, setExpression] = useState('3x^2 + 2x - 5');
   const [result, setResult] = useState<CompileResult | null>(null);
   const [loading, setLoading] = useState(false);
@@ -292,194 +299,245 @@ export default function App() {
         </div>
       </header>
 
-      <main className="flex-1 max-w-7xl mx-auto px-6 py-8 grid grid-cols-1 lg:grid-cols-12 gap-8 w-full">
-        {/* Left Column: Input & Tokens */}
-        <div className="lg:col-span-5 space-y-8">
-          <section className="space-y-4">
-            <div className="flex items-center gap-2 text-zinc-400">
-              <Terminal className="w-4 h-4" />
-              <h2 className="text-xs font-semibold uppercase tracking-wider">{t.source}</h2>
-            </div>
-            <form onSubmit={handleCompile} className="flex flex-col gap-3">
-              <div className="relative group">
-                <textarea
-                  value={expression}
-                  onChange={(e) => setExpression(e.target.value)}
-                  placeholder={t.placeholder}
-                  rows={3}
-                  className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-4 py-4 font-mono text-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all shadow-inner resize-none overflow-y-auto custom-scrollbar"
-                />
-              </div>
-              {result && result.converted !== expression && (
-                <motion.div 
-                  initial={{ opacity: 0, height: 0 }}
-                  animate={{ opacity: 1, height: 'auto' }}
-                  className="bg-indigo-500/10 border border-indigo-500/20 rounded-lg p-3 text-xs font-mono"
-                >
-                  <p className="text-indigo-400 font-bold mb-1 uppercase tracking-tighter">{t.converted}:</p>
-                  <p className="text-zinc-300">{result.converted}</p>
-                </motion.div>
-              )}
-              <button
-                type="submit"
-                disabled={loading}
-                className="w-full bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white py-3 rounded-xl flex items-center justify-center gap-2 transition-all active:scale-[0.98] shadow-lg shadow-indigo-500/20"
-              >
-                {loading ? (
-                  <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                ) : (
-                  <Play className="w-5 h-5 fill-current" />
-                )}
-                <span className="font-semibold">{t.compile}</span>
-              </button>
-            </form>
-          </section>
-
-          <section className="space-y-4">
-            <div className="flex items-center gap-2 text-zinc-400">
-              <Code2 className="w-4 h-4" />
-              <h2 className="text-xs font-semibold uppercase tracking-wider">{t.lexical}</h2>
-            </div>
-            <div className="bg-zinc-900/50 border border-zinc-800 rounded-xl p-4 min-h-[200px] max-h-[400px] overflow-y-auto custom-scrollbar shadow-inner backdrop-blur-sm">
-              <div className="flex flex-wrap gap-2">
-                <AnimatePresence mode="popLayout">
-                  {result?.tokens.map((token, idx) => (
-                    <motion.div
-                      key={`${idx}-${token.type}`}
-                      initial={{ opacity: 0, scale: 0.9 }}
-                      animate={{ opacity: 1, scale: 1 }}
-                      className="flex items-center gap-1.5 bg-zinc-800/50 border border-zinc-700/50 px-2.5 py-1 rounded-md hover:border-indigo-500/30 transition-colors"
-                    >
-                      <span className="text-[10px] font-mono text-zinc-500 uppercase">{token.type}</span>
-                      <span className="text-sm font-mono text-indigo-300">{token.value}</span>
-                    </motion.div>
-                  ))}
-                </AnimatePresence>
-                {!result && !loading && !error && (
-                  <p className="text-zinc-600 text-sm italic">{t.waiting}</p>
-                )}
-              </div>
-            </div>
-          </section>
+      {/* Subheader / Tab Switcher */}
+      <div className="bg-zinc-950/85 backdrop-blur border-b border-zinc-900 sticky top-16 z-20">
+        <div className="max-w-7xl mx-auto px-6 h-12 flex items-center justify-start gap-4">
+          <button
+            onClick={() => setActiveTab('math')}
+            className={`h-full px-4 text-xs font-bold uppercase font-mono tracking-wider border-b-2 flex items-center gap-1.5 transition-all ${
+              activeTab === 'math'
+                ? 'border-indigo-500 text-indigo-400 bg-indigo-500/5'
+                : 'border-transparent text-zinc-500 hover:text-zinc-300 hover:bg-zinc-900/40'
+            }`}
+          >
+            <Calculator className="w-3.5 h-3.5" />
+            {t.tabMath}
+          </button>
+          <button
+            onClick={() => setActiveTab('vm')}
+            className={`h-full px-4 text-xs font-bold uppercase font-mono tracking-wider border-b-2 flex items-center gap-1.5 transition-all ${
+              activeTab === 'vm'
+                ? 'border-indigo-500 text-indigo-400 bg-indigo-500/5'
+                : 'border-transparent text-zinc-500 hover:text-zinc-300 hover:bg-zinc-900/40'
+            }`}
+          >
+            <Cpu className="w-3.5 h-3.5" />
+            {t.tabVm}
+          </button>
         </div>
+      </div>
 
-        {/* Right Column: AST & Result */}
-        <div className="lg:col-span-7 space-y-8">
-          <div className="grid grid-cols-1 gap-8">
-            <section className="space-y-4 flex flex-col">
-              <div className="flex items-center justify-between text-zinc-400">
-                <div className="flex items-center gap-2">
-                  <Layers className="w-4 h-4" />
-                  <h2 className="text-xs font-semibold uppercase tracking-wider">{t.syntax}</h2>
-                </div>
-                <button 
-                  onClick={() => setShowJson(!showJson)}
-                  className="text-[10px] font-bold uppercase px-2 py-1 bg-zinc-800 rounded hover:bg-zinc-700 transition-colors"
-                >
-                  {showJson ? 'View Tree' : 'View JSON'}
-                </button>
-              </div>
-              <div className="flex-1 bg-zinc-900 border border-zinc-800 rounded-xl p-6 font-mono overflow-auto min-h-[400px] shadow-inner relative">
-                {result?.ast ? (
-                  showJson ? (
-                    <pre className="text-[10px] text-indigo-300 whitespace-pre-wrap">
-                      {JSON.stringify(result.ast, null, 2)}
-                    </pre>
-                  ) : (
-                    <TreeDiagram data={result.ast} />
-                  )
-                ) : (
-                  <div className="h-full flex items-center justify-center text-zinc-700 italic text-sm">
-                    {t.noTree}
-                  </div>
-                )}
-              </div>
-            </section>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-              <section className="space-y-4 flex flex-col">
+      <AnimatePresence mode="wait">
+        {activeTab === 'math' ? (
+          <motion.main 
+            key="math"
+            initial={{ opacity: 0, y: 15 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -15 }}
+            className="flex-1 max-w-7xl mx-auto px-6 py-8 grid grid-cols-1 lg:grid-cols-12 gap-8 w-full"
+          >
+            {/* Left Column: Input & Tokens */}
+            <div className="lg:col-span-5 space-y-8">
+              <section className="space-y-4">
                 <div className="flex items-center gap-2 text-zinc-400">
-                  <Calculator className="w-4 h-4" />
-                  <h2 className="text-xs font-semibold uppercase tracking-wider">{t.semantic}</h2>
+                  <Terminal className="w-4 h-4" />
+                  <h2 className="text-xs font-semibold uppercase tracking-wider">{t.source}</h2>
                 </div>
-                <div className="flex-1 bg-zinc-900 border border-zinc-800 rounded-xl p-6 flex flex-col items-center justify-center gap-4 shadow-inner relative overflow-hidden">
-                  <div className="absolute inset-0 bg-indigo-500/5 pointer-events-none" />
-                  <div className="text-zinc-500 text-sm uppercase tracking-widest font-mono z-10">{t.result} (x=2, y=3)</div>
-                  <div className="text-5xl font-bold tracking-tighter text-white z-10 text-center">
-                    {result ? (
-                      <motion.span
-                        initial={{ opacity: 0, y: 10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        key={result.result}
-                      >
-                        {typeof result.result === 'number' 
-                          ? (Number.isInteger(result.result) ? result.result : result.result.toFixed(4))
-                          : result.result
-                        }
-                      </motion.span>
-                    ) : (
-                      <span className="text-zinc-800">--</span>
-                    )}
+                <form onSubmit={handleCompile} className="flex flex-col gap-3">
+                  <div className="relative group">
+                    <textarea
+                      value={expression}
+                      onChange={(e) => setExpression(e.target.value)}
+                      placeholder={t.placeholder}
+                      rows={3}
+                      className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-4 py-4 font-mono text-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all shadow-inner resize-none overflow-y-auto custom-scrollbar"
+                    />
                   </div>
-                  {error && (
+                  {result && result.converted !== expression && (
                     <motion.div 
-                      initial={{ opacity: 0, scale: 0.95 }}
-                      animate={{ opacity: 1, scale: 1 }}
-                      className="mt-4 flex items-center gap-2 text-red-400 bg-red-400/10 border border-red-400/20 px-4 py-2 rounded-lg text-sm z-10"
+                      initial={{ opacity: 0, height: 0 }}
+                      animate={{ opacity: 1, height: 'auto' }}
+                      className="bg-indigo-500/10 border border-indigo-500/20 rounded-lg p-3 text-xs font-mono"
                     >
-                      <AlertCircle className="w-4 h-4" />
-                      {error}
+                      <p className="text-indigo-400 font-bold mb-1 uppercase tracking-tighter">{t.converted}:</p>
+                      <p className="text-zinc-300">{result.converted}</p>
                     </motion.div>
                   )}
-                </div>
+                  <button
+                    type="submit"
+                    disabled={loading}
+                    className="w-full bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white py-3 rounded-xl flex items-center justify-center gap-2 transition-all active:scale-[0.98] shadow-lg shadow-indigo-500/20"
+                  >
+                    {loading ? (
+                      <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    ) : (
+                      <Play className="w-5 h-5 fill-current" />
+                    )}
+                    <span className="font-semibold">{t.compile}</span>
+                  </button>
+                </form>
               </section>
-
-              <section className="space-y-4 flex flex-col">
+    
+              <section className="space-y-4">
                 <div className="flex items-center gap-2 text-zinc-400">
-                  <Binary className="w-4 h-4" />
-                  <h2 className="text-xs font-semibold uppercase tracking-wider">{t.simplified}</h2>
+                  <Code2 className="w-4 h-4" />
+                  <h2 className="text-xs font-semibold uppercase tracking-wider">{t.lexical}</h2>
                 </div>
-                <div className="flex-1 bg-zinc-900 border border-zinc-800 rounded-xl p-6 flex flex-col items-center justify-center gap-4 shadow-inner relative overflow-hidden">
-                  <div className="absolute inset-0 bg-emerald-500/5 pointer-events-none" />
-                  <div className="text-zinc-500 text-sm uppercase tracking-widest font-mono z-10">Stringify / Simplified</div>
-                  <div className="text-2xl font-mono font-medium text-emerald-400 z-10 text-center break-all">
-                    {result?.simplified || <span className="text-zinc-800">--</span>}
+                <div className="bg-zinc-900/50 border border-zinc-800 rounded-xl p-4 min-h-[200px] max-h-[400px] overflow-y-auto custom-scrollbar shadow-inner backdrop-blur-sm">
+                  <div className="flex flex-wrap gap-2">
+                    <AnimatePresence mode="popLayout">
+                      {result?.tokens.map((token, idx) => (
+                        <motion.div
+                          key={`${idx}-${token.type}`}
+                          initial={{ opacity: 0, scale: 0.9 }}
+                          animate={{ opacity: 1, scale: 1 }}
+                          className="flex items-center gap-1.5 bg-zinc-800/10 border border-zinc-700/50 px-2.5 py-1 rounded-md hover:border-indigo-500/30 transition-colors"
+                        >
+                          <span className="text-[10px] font-mono text-zinc-500 uppercase">{token.type}</span>
+                          <span className="text-sm font-mono text-indigo-300">{token.value}</span>
+                        </motion.div>
+                      ))}
+                    </AnimatePresence>
+                    {!result && !loading && !error && (
+                      <p className="text-zinc-600 text-sm italic">{t.waiting}</p>
+                    )}
                   </div>
                 </div>
               </section>
             </div>
-          </div>
-
-          {/* Academic Info */}
-          <section className="bg-indigo-500/5 border border-indigo-500/10 rounded-xl p-6 relative overflow-hidden">
-             <div className="absolute top-0 right-0 p-4 opacity-10">
-                <Info className="w-12 h-12 text-indigo-500" />
-             </div>
-            <h3 className="text-sm font-semibold text-indigo-300 mb-4 flex items-center gap-2">
-              <ChevronRight className="w-4 h-4" />
-              {t.phases}
-            </h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-xs text-zinc-400">
-              <div className="space-y-1.5">
-                <p className="text-zinc-200 font-semibold">{t.phase1}</p>
-                <p className="leading-relaxed">{t.phase1Desc}</p>
+    
+            {/* Right Column: AST & Result */}
+            <div className="lg:col-span-7 space-y-8">
+              <div className="grid grid-cols-1 gap-8">
+                <section className="space-y-4 flex flex-col">
+                  <div className="flex items-center justify-between text-zinc-400">
+                    <div className="flex items-center gap-2">
+                      <Layers className="w-4 h-4" />
+                      <h2 className="text-xs font-semibold uppercase tracking-wider">{t.syntax}</h2>
+                    </div>
+                    <button 
+                      onClick={() => setShowJson(!showJson)}
+                      className="text-[10px] font-bold uppercase px-2 py-1 bg-zinc-800 rounded hover:bg-zinc-700 transition-colors"
+                    >
+                      {showJson ? 'View Tree' : 'View JSON'}
+                    </button>
+                  </div>
+                  <div className="flex-1 bg-zinc-900 border border-zinc-800 rounded-xl p-6 font-mono overflow-auto min-h-[400px] shadow-inner relative">
+                    {result?.ast ? (
+                      showJson ? (
+                        <pre className="text-[10px] text-indigo-300 whitespace-pre-wrap">
+                          {JSON.stringify(result.ast, null, 2)}
+                        </pre>
+                      ) : (
+                        <TreeDiagram data={result.ast} />
+                      )
+                    ) : (
+                      <div className="h-full flex items-center justify-center text-zinc-700 italic text-sm">
+                        {t.noTree}
+                      </div>
+                    )}
+                  </div>
+                </section>
+    
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                  <section className="space-y-4 flex flex-col">
+                    <div className="flex items-center gap-2 text-zinc-400">
+                      <Calculator className="w-4 h-4" />
+                      <h2 className="text-xs font-semibold uppercase tracking-wider">{t.semantic}</h2>
+                    </div>
+                    <div className="flex-1 bg-zinc-900 border border-zinc-800 rounded-xl p-6 flex flex-col items-center justify-center gap-4 shadow-inner relative overflow-hidden">
+                      <div className="absolute inset-0 bg-indigo-500/5 pointer-events-none" />
+                      <div className="text-zinc-500 text-sm uppercase tracking-widest font-mono z-10">{t.result} (x=2, y=3)</div>
+                      <div className="text-5xl font-bold tracking-tighter text-white z-10 text-center">
+                        {result ? (
+                          <motion.span
+                            initial={{ opacity: 0, y: 10 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            key={result.result}
+                          >
+                            {typeof result.result === 'number' 
+                              ? (Number.isInteger(result.result) ? result.result : result.result.toFixed(4))
+                              : result.result
+                            }
+                          </motion.span>
+                        ) : (
+                          <span className="text-zinc-800">--</span>
+                        )}
+                      </div>
+                      {error && (
+                        <motion.div 
+                          initial={{ opacity: 0, scale: 0.95 }}
+                          animate={{ opacity: 1, scale: 1 }}
+                          className="mt-4 flex items-center gap-2 text-red-400 bg-red-400/10 border border-red-400/20 px-4 py-2 rounded-lg text-sm z-10"
+                        >
+                          <AlertCircle className="w-4 h-4" />
+                          {error}
+                        </motion.div>
+                      )}
+                    </div>
+                  </section>
+    
+                  <section className="space-y-4 flex flex-col">
+                    <div className="flex items-center gap-2 text-zinc-400">
+                      <Binary className="w-4 h-4" />
+                      <h2 className="text-xs font-semibold uppercase tracking-wider">{t.simplified}</h2>
+                    </div>
+                    <div className="flex-1 bg-zinc-900 border border-zinc-800 rounded-xl p-6 flex flex-col items-center justify-center gap-4 shadow-inner relative overflow-hidden">
+                      <div className="absolute inset-0 bg-emerald-500/5 pointer-events-none" />
+                      <div className="text-zinc-500 text-sm uppercase tracking-widest font-mono z-10">Stringify / Simplified</div>
+                      <div className="text-2xl font-mono font-medium text-emerald-400 z-10 text-center break-all">
+                        {result?.simplified || <span className="text-zinc-800">--</span>}
+                      </div>
+                    </div>
+                  </section>
+                </div>
               </div>
-              <div className="space-y-1.5">
-                <p className="text-zinc-200 font-semibold">{t.phase2}</p>
-                <p className="leading-relaxed">{t.phase2Desc}</p>
-              </div>
-              <div className="space-y-1.5">
-                <p className="text-zinc-200 font-semibold">{t.phase3}</p>
-                <p className="leading-relaxed">{t.phase3Desc}</p>
-              </div>
-              <div className="space-y-1.5">
-                <p className="text-zinc-200 font-semibold">{t.phase4}</p>
-                <p className="leading-relaxed">{t.phase4Desc}</p>
-              </div>
+    
+              {/* Automaton Info */}
+              <SystemAutomaton expression={result?.converted || expression} lang={lang} />
+    
+              {/* Academic Info */}
+              <section className="bg-indigo-500/5 border border-indigo-500/10 rounded-xl p-6 relative overflow-hidden">
+                 <div className="absolute top-0 right-0 p-4 opacity-10">
+                    <Info className="w-12 h-12 text-indigo-500" />
+                 </div>
+                <h3 className="text-sm font-semibold text-indigo-300 mb-4 flex items-center gap-2">
+                  <ChevronRight className="w-4 h-4" />
+                  {t.phases}
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-xs text-zinc-400">
+                  <div className="space-y-1.5">
+                    <p className="text-zinc-200 font-semibold">{t.phase1}</p>
+                    <p className="leading-relaxed">{t.phase1Desc}</p>
+                  </div>
+                  <div className="space-y-1.5">
+                    <p className="text-zinc-200 font-semibold">{t.phase2}</p>
+                    <p className="leading-relaxed">{t.phase2Desc}</p>
+                  </div>
+                  <div className="space-y-1.5">
+                    <p className="text-zinc-200 font-semibold">{t.phase3}</p>
+                    <p className="leading-relaxed">{t.phase3Desc}</p>
+                  </div>
+                  <div className="space-y-1.5">
+                    <p className="text-zinc-200 font-semibold">{t.phase4}</p>
+                    <p className="leading-relaxed">{t.phase4Desc}</p>
+                  </div>
+                </div>
+              </section>
             </div>
-          </section>
-        </div>
-      </main>
+          </motion.main>
+        ) : (
+          <motion.main
+            key="vm"
+            initial={{ opacity: 0, y: 15 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -15 }}
+            className="flex-1 max-w-7xl mx-auto px-6 py-8 w-full"
+          >
+            <StackVmSimulator lang={lang} />
+          </motion.main>
+        )}
+      </AnimatePresence>
 
       {/* Creators Footer */}
       <footer className="border-t border-zinc-800 bg-zinc-900/30 py-10 mt-12">
